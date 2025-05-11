@@ -1,0 +1,3 @@
+/models
+# Ignorer les fichiers contenant des secrets
+.env
