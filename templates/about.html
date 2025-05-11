@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}À propos - Chatbot ISET{% endblock %}
+{% block css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='about.css') }}">
+{% endblock %}
+{% block content %}
+<div class="about-content">
+    <h2>À propos de Chatbot ISET</h2>
+    <p>
+        Ce chatbot a été développé dans le cadre du mini-projet Machine Learning pour le cours DSIR 12, offrant des réponses rapides et intelligentes aux étudiants de l'ISET.
+    </p>
+    <div class="about-image">
+        <img src="{{ url_for('static', filename='assistant-avatar.png') }}" alt="Assistant" class="avatar">
+    </div>
+    <h3>Fonctionnalités</h3>
+    <ul>
+        <li>⚙️ Traitement du langage naturel avec NLTK</li>
+        <li>📊 Classification avec Naive Bayes et MLP</li>
+        <li>📝 Embeddings avec TF-IDF et BERT</li>
+        <li>🔍 Moteur de recherche avec Whoosh</li>
+        <li>🌐 Support multilingue (français et anglais)</li>
+        <li>💡 Suggestions proactives selon le contexte</li>
+        <li>📚 Auto-apprentissage basé sur les nouvelles questions</li>
+        <li>⭐ Système d’évaluation des réponses</li>
+    </ul>
+    <a href="/" class="back-btn">Retour au Chat</a>
+</div>
+{% endblock %}

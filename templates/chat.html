@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block title %}Chat - Chatbot ISET{% endblock %}
+{% block content %}
+{% if public_share %}
+<div style="background: #e0e7ef; color: #333; padding: 1rem; border-radius: 10px; margin: 1rem auto; max-width: 700px; text-align: center; font-weight: 500;">
+    <i class="fas fa-globe" style="margin-right: 0.5rem;"></i>
+    Ceci est un lien de partage public. Toute personne disposant de ce lien peut consulter cette session de chat (lecture seule).
+</div>
+{% endif %}
+{% if current_user.is_authenticated %}
+<div class="chat-box" id="chat-box">
+  {% if not chat_history %}
+  <div class="chat-message assistant">
+    <img
+      src="{{ url_for('static', filename='assistant-avatar.png') }}"
+      alt="Assistant"
+      class="avatar"
+    />
+    <div class="chat-bubble">
+      Bonjour ! Posez-moi une question ou utilisez un raccourci ci-dessous.
+    </div>
+  </div>
+  {% endif %}
+  {% for msg in chat_history %}
+  <div class="chat-message user" data-message="{{ msg.user_message | lower }}">
+    <div class="chat-bubble">
+      {{ msg.user_message | safe }}
+      <div class="timestamp">{{ msg.timestamp | default('Maintenant') }}</div>
+      <button
+        class="copy-btn"
+        onclick="copyText(this)"
+        data-text="{{ msg.user_message | escape }}"
+      >
+        <i class="shortcut-icon fas fa-copy"></i>
+      </button>
+    </div>
+  </div>
+  <div class="chat-message assistant" data-message="{{ msg.bot_response.answer | lower }}">
+    <img
+      src="{{ url_for('static', filename='assistant-avatar.png') }}"
+      alt="Assistant"
+      class="avatar"
+    />
+    <div class="chat-bubble">
+      {{ msg.bot_response.answer | safe }}
+      {% if msg.bot_response.file_path %}
+      <div class="mt-2">
+        {% set ext = msg.bot_response.file_path.split('.')[-1].lower() %}
+        {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] %}
+          <img src="{{ url_for('static', filename='files/' + msg.bot_response.file_path) }}" alt="Image associée" style="max-width: 300px; max-height: 300px; display: block; margin: 0.5rem 0; border-radius: 8px;" />
+        {% elif ext == 'pdf' %}
+          <a href="{{ url_for('static', filename='files/' + msg.bot_response.file_path) }}" target="_blank" class="text-blue-500 hover:underline" download>
+            <i class="fas fa-file-pdf"></i> Télécharger le PDF
+          </a>
+        {% else %}
+          <a href="{{ url_for('static', filename='files/' + msg.bot_response.file_path) }}" target="_blank" class="text-blue-500 hover:underline" download>
+            <i class="fas fa-download"></i> Télécharger le fichier
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if msg.bot_response.url %}
+      <div class="mt-2">
+        <a
+          href="{{ msg.bot_response.url }}"
+          target="_blank"
+          class="text-blue-500 hover:underline"
+        >En savoir plus</a>
+      </div>
+      {% endif %}
+      {% if msg.bot_response.method %}
+      <div class="text-xs mt-2 opacity-70">
+        Méthode: {{ msg.bot_response.method }}
+        {% if msg.bot_response.similarity %}
+        (Similarité: {{ "%.2f"|format(msg.bot_response.similarity * 100) }}%)
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="timestamp">
+        {{ msg.timestamp | default('Maintenant') }}
+      </div>
+      <div class="feedback">
+        Utile ?
+        <span
+          onclick="rateResponse(this, true)"
+          data-question="{{ msg.user_message | escape }}"
+          data-response="{{ msg.bot_response.answer | escape }}"
+          class="text-green-500 cursor-pointer"
+        ><i class="shortcut-icon fas fa-thumbs-up"></i></span>
+        <span
+          onclick="rateResponse(this, false)"
+          data-question="{{ msg.user_message | escape }}"
+          data-response="{{ msg.bot_response.answer | escape }}"
+          class="text-red-500 cursor-pointer"
+        ><i class="shortcut-icon fas fa-thumbs-down"></i></span>
+      </div>
+      <div class="bubble-actions" style="position: absolute; bottom: 0.5rem; right: 1rem; display: flex; gap: 0.5rem;">
+        <button
+          class="copy-btn"
+          style="position: static; opacity: 1;"
+          onclick="copyText(this)"
+          data-text="{{ msg.bot_response.answer | escape }}"
+          title="Copier la réponse"
+        >
+          <i class="shortcut-icon fas fa-copy"></i>
+        </button>
+        <button
+          class="copy-btn"
+          style="position: static; opacity: 1;"
+          onclick="speakText(this)"
+          data-text="{{ msg.bot_response.answer | escape }}"
+          title="Écouter la réponse"
+        >
+          <i class="shortcut-icon fas fa-volume-up"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="loading-indicator hidden">
+    <div class="animate-pulse">Chargement...</div>
+  </div>
+</div>
+
+<!-- Search input only visible when logged in -->
+<div id="search-bar-container"></div>
+
+{% if not public_share %}
+<div class="input-container">
+  <div class="input-area">
+    <form method="POST" id="chat-form">
+      <input
+        type="hidden"
+        name="session_id"
+        id="session-id"
+        value="{{ session_id if session_id else '' }}"
+      />
+      <div class="textarea-wrapper">
+        <textarea
+          name="message"
+          id="message-input"
+          required
+          placeholder="Posez votre question..."
+          class="w-full p-2 border rounded"
+        ></textarea>
+        <div class="textarea-buttons">
+          <button
+            type="button"
+            id="voice-btn"
+            class="shortcut-btn bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            <i class="shortcut-icon fas fa-microphone"></i>
+          </button>
+          <button
+            type="submit"
+            id="submit-btn"
+            class="shortcut-btn bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            <i class="shortcut-icon fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="shortcut-buttons flex gap-2">
+    <button class="shortcut-btn bg-gray-100 p-2 rounded" onclick="sendShortcut('🕒 Horaires')"><i class="shortcut-icon fas fa-clock"></i> Horaires</button>
+    <button class="shortcut-btn bg-gray-100 p-2 rounded" onclick="sendShortcut('📞 Contact')"><i class="shortcut-icon fas fa-address-book"></i> Contact</button>
+    <button class="shortcut-btn bg-gray-100 p-2 rounded" onclick="sendShortcut('📝 Inscription')"><i class="shortcut-icon fas fa-user-plus"></i> Inscription</button>
+    <button class="shortcut-btn bg-gray-100 p-2 rounded" onclick="sendShortcut('📚 Bibliothèque')"><i class="shortcut-icon fas fa-book"></i> Bibliothèque</button>
+    <button class="shortcut-btn bg-gray-100 p-2 rounded" onclick="sendShortcut('📖 Examens')"><i class="shortcut-icon fas fa-graduation-cap"></i> Examens</button>
+</div>
+</div>
+{% endif %}
+{% else %}
+<div class="login-center">
+  <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 1.5rem; width: 100%;">
+    <div style="margin-bottom: 1.2rem;">
+      <span style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%); border-radius: 50%; padding: 0.3rem; box-shadow: 0 2px 8px rgba(37,99,235,0.13);">
+        <img src="{{ url_for('static', filename='assistant-avatar.PNG') }}" alt="Chatbot Logo" style="width: 10rem; height: 10rem; border-radius: 50%; padding: 0.3rem; display: block; background: #fff;" />
+      </span>
+    </div>
+    <div style="border-radius: 18px; box-shadow: none; padding: 0; width: 80%; max-width: 900px; min-width: 320px; text-align: center; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="font-size: 2.1rem; font-weight: 800; color: #2563eb; letter-spacing: 0.01em; line-height: 1.3; margin-bottom: 0.7rem;">
+        Pas d'ondes cérébrales sans connexion
+      </div>
+      <div style="font-size: 1.35rem; font-weight: 600; color: #0ea5e9; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+        <span style="color: #0ea5e9; font-weight: 700;">Bratuha !</span>
+        <span style="color: #64748b; font-style: italic; font-weight: 500;">Règles de la jungle numérique</span>
+        <a href="{{ url_for('login') }}" style="margin-left: 0.5rem; display: flex; align-items: center; text-decoration: none;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; background: #fff; border-radius: 50%; width: 2.1rem; height: 2.1rem; box-shadow: 0 1px 4px rgba(37,99,235,0.10);"><i class="fa-brands fa-google" style="font-size: 1.3rem; color: #ea4335;"></i></span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="custom-alert hidden" id="feedback-alert">
+  <p>Merci pour votre retour !</p>
+  <button class="shortcut-btn bg-blue-500 text-white rounded hover:bg-blue-600" onclick="hideAlert()">OK</button>
+</div>
+<div class="overlay hidden" id="overlay"></div>
+
+{% if current_user.is_authenticated %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const submitBtn = document.getElementById('submit-btn');
+    const voiceBtn = document.getElementById('voice-btn');
+    const loadingIndicator = document.querySelector('.loading-indicator');
+    const sessionIdInput = document.getElementById('session-id');
+    const shareChatBtn = document.getElementById('share-chat-icon');
+
+    // Add search input with icon
+    const searchBarContainer = document.getElementById('search-bar-container');
+    if (searchBarContainer) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'search-input-wrapper';
+      wrapper.innerHTML = `
+        <span class="search-input-icon"><i class="fas fa-search"></i></span>
+        <input type="text" class="search-input" id="search-input" placeholder="Rechercher dans la conversation..." autocomplete="off" />
+      `;
+      // Insert into top bar controls if available, else at the top
+      const topBarControls = document.querySelector('.top-bar-controls');
+      if (topBarControls) {
+        topBarControls.insertBefore(wrapper, topBarControls.firstChild);
+      } else {
+        searchBarContainer.appendChild(wrapper);
+      }
+      // Search logic
+      const searchInput = wrapper.querySelector('.search-input');
+      searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const messages = document.querySelectorAll('.chat-message');
+        messages.forEach(msg => {
+          const messageText = msg.getAttribute('data-message') || '';
+          if (searchTerm && messageText.includes(searchTerm)) {
+            msg.classList.add('search-highlight');
+            msg.style.display = '';
+          } else if (searchTerm) {
+            msg.classList.remove('search-highlight');
+            msg.style.display = 'none';
+          } else {
+            msg.classList.remove('search-highlight');
+            msg.style.display = '';
+          }
+        });
+      });
+    }
+
+    function scrollToBottom() {
+      const chatBox = document.getElementById('chat-box');
+      if (chatBox) {
+        chatBox.scrollTo({
+          top: chatBox.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+
+    function showAlert() {
+      const alert = document.getElementById('feedback-alert');
+      const overlay = document.getElementById('overlay');
+      alert.classList.remove('hidden');
+      overlay.classList.remove('hidden');
+    }
+
+    function hideAlert() {
+      const alert = document.getElementById('feedback-alert');
+      const overlay = document.getElementById('overlay');
+      alert.classList.add('hidden');
+      overlay.classList.add('hidden');
+    }
+    
+    // Make hideAlert available globally
+    window.hideAlert = hideAlert;
+
+    scrollToBottom();
+
+    let sessionId = sessionIdInput?.value;
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      if (sessionIdInput) sessionIdInput.value = sessionId;
+    }
+
+    let isRecording = false;
+    let recognition = null;
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'fr-FR';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.continuous = true;
+
+      recognition.onresult = (event) => {
+        const lastResultIndex = event.results.length - 1;
+        const transcript = event.results[lastResultIndex][0].transcript;
+        messageInput.value += ' ' + transcript;
+        messageInput.value = messageInput.value.trim();
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        alert('Erreur lors de la reconnaissance vocale : ' + event.error);
+        voiceBtn.classList.remove('recording');
+        voiceBtn.innerHTML = '<i class="shortcut-icon fas fa-microphone"></i>';
+        isRecording = false;
+      };
+
+      recognition.onend = () => {
+        if (isRecording && messageInput.value.trim()) {
+          chatForm?.dispatchEvent(new Event('submit'));
+        }
+        voiceBtn.classList.remove('recording');
+        voiceBtn.innerHTML = '<i class="shortcut-icon fas fa-microphone"></i>';
+        isRecording = false;
+      };
+    } else {
+      voiceBtn.style.display = 'none'; // Hide voice button if unsupported
+    }
+
+    voiceBtn?.addEventListener('click', () => {
+      if (!recognition) return;
+      if (!isRecording) {
+        messageInput.value = '';
+        recognition.start();
+        voiceBtn.classList.add('recording');
+        voiceBtn.innerHTML = '<i class="shortcut-icon fas fa-microphone-slash"></i>';
+        isRecording = true;
+      } else {
+        recognition.stop();
+      }
+    });
+
+    chatForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!messageInput.value.trim()) return;
+
+      submitBtn.disabled = true;
+      loadingIndicator?.classList.remove('hidden');
+
+      try {
+        const formData = new FormData(chatForm);
+        const response = await fetch('/', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, 'text/html');
+          const newChatBox = doc.getElementById('chat-box');
+          if (newChatBox) {
+            document.getElementById('chat-box').innerHTML = newChatBox.innerHTML;
+            scrollToBottom();
+          }
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        alert('Erreur lors de l\'envoi du message. Veuillez réessayer plus tard.');
+      } finally {
+        submitBtn.disabled = false;
+        loadingIndicator?.classList.add('hidden');
+        messageInput.value = '';
+        messageInput.focus();
+      }
+    });
+
+    messageInput?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm?.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    if (shareChatBtn) {
+      shareChatBtn.addEventListener('click', async () => {
+        const sessionId = document.getElementById('session-id')?.value;
+        if (!sessionId) return;
+        // The sharing logic is now handled in base.html, so do nothing here.
+      });
+    }
+  });
+
+  // Make these functions available globally
+  function copyText(btn) {
+    const text = btn.getAttribute('data-text');
+    navigator.clipboard.writeText(text).then(() => {
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '<i class="shortcut-icon fas fa-check"></i>';
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+  }
+
+  function speakText(btn) {
+    const text = btn.getAttribute('data-text');
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'fr-FR';
+      speechSynthesis.speak(utterance);
+    }
+  }
+
+  async function rateResponse(btn, isUseful) {
+    try {
+      const question = btn.getAttribute('data-question');
+      const response = btn.getAttribute('data-response');
+      if (!question || !response) {
+        throw new Error('Question or response data is missing');
+      }
+      const result = await fetch('/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          question: question, 
+          response: response,
+          rating: isUseful ? 1 : -1 
+        })
+      });
+
+      if (result.ok) {
+        const data = await result.json();
+        if (data.status === 'success') {
+          const alert = document.getElementById('feedback-alert');
+          const overlay = document.getElementById('overlay');
+          alert.classList.remove('hidden');
+          overlay.classList.remove('hidden');
+          btn.parentElement.classList.add('opacity-50');
+        } else {
+          throw new Error(data.message || 'Server error');
+        }
+      } else {
+        throw new Error(`HTTP error! status: ${result.status}`);
+      }
+    } catch (error) {
+      console.error('Rating error:', error);
+      alert('Erreur lors de l\'envoi du retour.');
+    }
+  }
+
+  function sendShortcut(cmd) {
+    const input = document.getElementById('message-input');
+    input.value = cmd;
+    input.focus();
+    document.getElementById('chat-form')?.dispatchEvent(new Event('submit'));
+  }
+</script>
+{% else %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // ... rest of existing code ...
+  });
+</script>
+{% endif %}
+{% endblock %}

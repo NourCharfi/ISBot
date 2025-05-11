@@ -1,0 +1,30 @@
+{
+  "name": "ISBot",
+  "short_name": "ISBot",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#232946",
+  "theme_color": "#232946",
+  "icons": [
+    {
+      "src": "/static/logoX.PNG",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/logoX.PNG",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/logoX.PNG",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/logoX.PNG",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+} 

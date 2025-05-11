@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISBOT</title
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='assistant-avatar.png') }}" />
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+  {% block css %}{% endblock %}
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+        <img src="{{ url_for('static', filename='assistant-avatar.PNG') }}" alt="ISBot Logo" class="sidebar-logo" style="height: 70px; width: auto; margin: 1.2rem 0 1.2rem 0; display: block;" />
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/" class="{% if request.path == '/' %}active{% endif %}"><i class="shortcut-icon fas fa-comment"></i> Chat</a>
+        <a href="/about" class="{% if request.path == '/about' %}active{% endif %}"><i class="shortcut-icon fas fa-info-circle"></i> À propos</a>
+      </nav>
+      {% if current_user.is_authenticated %}
+      <h3 class="sidebar-history-title" style="padding: 0 1.5rem; margin-top: 2rem; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 600; color: var(--text-color);">Historique de Chat</h3>
+      <div class="sidebar-history">
+        <div id="chat-history"></div>
+      </div>
+      {% endif %}
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="top-bar" style="padding-left: 0; display: flex; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 1.2rem; margin-left: 1.5rem;">
+          <button class="sidebar-toggle" aria-label="Toggle sidebar"><i class="shortcut-icon fas fa-bars"></i></button>
+          <img src="{{ url_for('static', filename='logoX.PNG') }}" alt="ISBot Logo" style="height: 100px; width: auto; display: block;" />
+        </div>
+        <div class="top-bar-controls" style="display: flex; align-items: center; gap: 1rem; margin-left: auto;">
+          {% if current_user.is_authenticated %}
+          <a href="{{ url_for('logout') }}" class="icon-btn" aria-label="Logout"><i class="shortcut-icon fas fa-sign-out-alt"></i></a>
+          <button id="share-chat-icon" class="icon-btn" aria-label="Share chat"><i class="shortcut-icon fas fa-share"></i></button>
+          <button id="new-chat-icon" class="icon-btn" aria-label="New chat"><i class="shortcut-icon fas fa-plus"></i></button>
+          {% else %}
+          <a href="{{ url_for('login') }}" class="icon-btn" aria-label="Login"><i class="shortcut-icon fas fa-sign-in-alt"></i></a>
+          {% endif %}
+          <button class="theme-toggle" aria-label="Toggle theme"><i class="shortcut-icon fas fa-moon"></i></button>
+        </div>
+      </header>
+      <section class="chat-wrapper">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
+
+  <!-- Confirmation Popup -->
+  <div class="overlay hidden" id="delete-overlay"></div>
+  <div class="confirmation-popup hidden" id="confirmation-popup">
+    <p>Êtes-vous sûr de vouloir supprimer ce chat ?</p>
+    <button class="confirm-btn" id="confirm-delete">Oui</button>
+    <button class="cancel-btn" id="cancel-delete">Non</button>
+  </div>
+
+  <!-- QR Code Share Popup (centered, modern style) -->
+  <div id="qr-popup" class="qr-popup hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(35,41,70,0.95); color: #fff; border-radius: 22px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); padding: 2.5rem 2.5rem 2rem 2.5rem; z-index: 2000; text-align: center; min-width: 320px; max-width: 95vw; backdrop-filter: blur(8px);">
+    <div id="qr-code" style="margin: 0 auto; background: #fff; border-radius: 16px; padding: 1rem; display: inline-block;"></div>
+    <p style="margin-top: 1.5rem; font-size: 1.15rem; font-weight: 500;">Scannez ce QR code ou cliquez sur le lien :</p>
+    <a id="qr-link" href="#" target="_blank" style="display:inline-block;word-break:break-all;color:#3399FF;text-decoration:underline;font-size:1.05rem;margin:0.7rem 0 1.2rem 0;"></a>
+    <br>
+    <button onclick="hideQrPopup()" style="margin-top:1.2rem;background:rgba(51,153,255,0.95);color:#fff;border:none;padding:0.7rem 2.2rem;border-radius:12px;cursor:pointer;font-weight:600;font-size:1.1rem;box-shadow:0 2px 8px rgba(51,153,255,0.18);transition:background 0.2s;">Fermer</button>
+  </div>
+
+  <!-- Toast for link copied -->
+  <div id="link-copied-toast" style="display:none;position:fixed;bottom:2rem;right:2rem;background:#232946;color:#fff;padding:0.9rem 1.7rem;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.18);font-size:1rem;z-index:3000;font-weight:500;">Lien copié !</div>
+
+  <script>
+    function showCopiedSharePopup(link, msg) {
+      const popup = document.getElementById('share-copied-popup');
+      const linkElem = document.getElementById('share-copied-link');
+      if (linkElem) {
+        if (msg) {
+          linkElem.textContent = msg;
+        } else if (link) {
+          linkElem.innerHTML = `Lien copié : <a href="${link}" target="_blank" style="color:#fff;text-decoration:underline;">${link}</a>`;
+        } else {
+          linkElem.textContent = 'Lien copié !';
+        }
+      }
+      popup.classList.remove('hidden');
+      setTimeout(() => popup.classList.add('hidden'), 4000);
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      const themeButton = document.querySelector('.theme-toggle');
+      themeButton.innerHTML = `<i class="shortcut-icon fas ${newTheme === 'dark' ? 'fa-moon' : 'fa-sun'}"></i>`;
+    }
+
+    function loadChatHistory() {
+      // Fetch user chat sessions
+      fetch('/get_sessions')
+        .then(response => response.json())
+        .then(data => {
+          localStorage.setItem('chatSessions', JSON.stringify(data));
+          const chatHistoryDiv = document.getElementById('chat-history');
+          if (chatHistoryDiv) {
+            chatHistoryDiv.innerHTML = data.map((session, index) => `
+              <div class="history-item" data-session-id="${session.id}">
+                <span class="history-text"><i class="fas fa-comments"></i> ${session.title}</span>
+                <button class="delete-btn" data-session-id="${session.id}"><i class="shortcut-icon fas fa-trash"></i></button>
+              </div>
+            `).join('');
+          }
+        })
+        .catch(error => console.error('Error loading chat history:', error));
+    }
+
+    function startNewChat() {
+      fetch('/new_chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(response => response.json()).then(data => {
+        if (data.status === 'success') {
+          let sessions = JSON.parse(localStorage.getItem('chatSessions') || '[]');
+          sessions.push({ id: data.session_id, date: new Date().toISOString(), messages: [] });
+          localStorage.setItem('chatSessions', JSON.stringify(sessions));
+          window.location.href = `/?session_id=${data.session_id}`;
+        }
+      }).catch(error => console.error('Error starting new chat:', error));
+    }
+
+    function shareChat() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session_id');
+      const shareUrl = sessionId ? `${window.location.origin}/?session_id=${sessionId}` : window.location.origin;
+      
+      if (navigator.share) {
+        navigator.share({
+          title: 'Chatbot ISET',
+          text: 'Voici ma conversation sur Chatbot ISET !',
+          url: shareUrl
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(shareUrl)
+          .then(() => showCopiedSharePopup(shareUrl))
+          .catch(error => {
+            console.error('Error copying share link:', error);
+            alert('Erreur lors de la copie du lien.');
+          });
+      }
+    }
+
+    function showConfirmation(sessionId) {
+      const overlay = document.getElementById('delete-overlay');
+      const popup = document.getElementById('confirmation-popup');
+      const confirmBtn = document.getElementById('confirm-delete');
+      const cancelBtn = document.getElementById('cancel-delete');
+
+      overlay.classList.remove('hidden');
+      popup.classList.remove('hidden');
+
+      confirmBtn.onclick = () => {
+        deleteChat(sessionId);
+        overlay.classList.add('hidden');
+        popup.classList.add('hidden');
+      };
+
+      cancelBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        popup.classList.add('hidden');
+      };
+
+      overlay.onclick = () => {
+        overlay.classList.add('hidden');
+        popup.classList.add('hidden');
+      };
+    }
+
+    function deleteChat(sessionId) {
+      fetch('/delete_chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      }).then(response => response.json()).then(data => {
+        if (data.status === 'success') {
+          let sessions = JSON.parse(localStorage.getItem('chatSessions') || '[]');
+          sessions = sessions.filter(session => session.id != sessionId);
+          localStorage.setItem('chatSessions', JSON.stringify(sessions));
+          loadChatHistory();
+          const urlParams = new URLSearchParams(window.location.search);
+          const currentSessionId = urlParams.get('session_id');
+          if (currentSessionId == sessionId) {
+            window.location.href = '/';
+          }
+        }
+      }).catch(error => console.error('Error deleting chat:', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const themeButton = document.querySelector('.theme-toggle');
+      themeButton.innerHTML = `<i class="shortcut-icon fas ${savedTheme === 'dark' ? 'fa-moon' : 'fa-sun'}"></i>`;
+
+      document.querySelector('.theme-toggle').addEventListener('click', toggleTheme);
+      
+      const newChatBtn = document.getElementById('new-chat-icon');
+      if (newChatBtn) {
+        newChatBtn.addEventListener('click', startNewChat);
+      }
+      
+      const shareChatBtn = document.getElementById('share-chat-icon');
+      if (shareChatBtn) {
+        shareChatBtn.addEventListener('click', async () => {
+          const sessionId = document.getElementById('session-id')?.value;
+          if (!sessionId) return;
+          // Prevent sharing if running locally
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            showQrPopup(null, null, true);
+            return;
+          }
+          try {
+            const res = await fetch(`/api/share_chat/${sessionId}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') {
+              const shareUrl = data.share_url;
+              // Always copy the link automatically
+              await navigator.clipboard.writeText(shareUrl);
+              showQrPopup(shareUrl);
+            } else {
+              showQrPopup(null, 'Erreur lors de la génération du lien de partage.');
+            }
+          } catch (e) {
+            showQrPopup(null, 'Erreur lors de la génération du lien de partage.');
+          }
+        });
+      }
+
+      const deleteOverlay = document.getElementById('delete-overlay');
+      const confirmationPopup = document.getElementById('confirmation-popup');
+      if (deleteOverlay && !deleteOverlay.classList.contains('hidden')) {
+        deleteOverlay.classList.add('hidden');
+      }
+      if (confirmationPopup && !confirmationPopup.classList.contains('hidden')) {
+        confirmationPopup.classList.add('hidden');
+      }
+
+      // Check if user is authenticated and load chat history if needed
+      if (document.getElementById('chat-history')) {
+        loadChatHistory();
+      }
+
+      const chatHistoryDiv = document.getElementById('chat-history');
+      if (chatHistoryDiv) {
+        chatHistoryDiv.addEventListener('click', (e) => {
+          // Check if clicked on delete button or its icon
+          if (e.target.classList.contains('delete-btn') || 
+              (e.target.tagName === 'I' && e.target.parentElement.classList.contains('delete-btn'))) {
+            const btn = e.target.classList.contains('delete-btn') ? e.target : e.target.parentElement;
+            const sessionId = btn.getAttribute('data-session-id');
+            if (sessionId) {
+              showConfirmation(sessionId);
+              e.stopPropagation(); // Prevent navigating to chat
+            }
+          } 
+          // Check if clicked on history item or its text content
+          else if (e.target.classList.contains('history-item') || 
+                  (e.target.classList.contains('history-text') && e.target.parentElement.classList.contains('history-item'))) {
+            const item = e.target.classList.contains('history-item') ? e.target : e.target.parentElement;
+            const sessionId = item.getAttribute('data-session-id');
+            if (sessionId) {
+              window.location.href = `/?session_id=${sessionId}`;
+            }
+          }
+        });
+      }
+
+      const sidebar = document.querySelector('.sidebar');
+      const mainContent = document.querySelector('.main-content');
+      const sidebarToggle = document.querySelector('.sidebar-toggle');
+
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+          sidebar.classList.toggle('hidden');
+          mainContent.classList.toggle('sidebar-hidden');
+        });
+      }
+    });
+
+    function showQrPopup(link, msg, isLocal) {
+      const popup = document.getElementById('qr-popup');
+      const qrDiv = document.getElementById('qr-code');
+      const qrLink = document.getElementById('qr-link');
+      qrDiv.innerHTML = '';
+      if (link) {
+        const qr = new QRious({
+          element: document.createElement('canvas'),
+          value: link,
+          size: 220
+        });
+        qrDiv.appendChild(qr.element);
+        qrLink.href = link;
+        qrLink.textContent = link;
+        qrLink.style.display = 'inline-block';
+      } else {
+        qrLink.textContent = msg || 'Erreur de partage.';
+        qrLink.href = '#';
+        qrLink.style.display = 'none';
+      }
+      if (isLocal) {
+        qrDiv.innerHTML = '';
+        qrLink.style.display = 'none';
+        popup.querySelector('p').textContent = 'Le partage n\'est pas disponible en local.';
+      } else {
+        popup.querySelector('p').textContent = 'Scannez ce QR code ou cliquez sur le lien :';
+      }
+      popup.classList.remove('hidden');
+    }
+
+    function hideQrPopup() {
+      document.getElementById('qr-popup').classList.add('hidden');
+    }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/static/service-worker.js')
+          .then(function(reg) { /* success */ })
+          .catch(function(err) { /* fail */ });
+      });
+    }
+  </script>
+</body>
+</html>

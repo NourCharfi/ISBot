@@ -1,0 +1,104 @@
+.about-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    flex: 1;
+}
+
+.about-content h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.about-content h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+
+.about-content p {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-color);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.about-content ul {
+    list-style-type: none;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.about-content li {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    background: var(--input-bg);
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background 0.3s ease;
+}
+
+.about-content li:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
+.about-image {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+}
+
+.about-image .avatar {
+    width: 80px;
+    height: 80px;
+}
+
+.back-btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--accent-color);
+    color: white;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.3s ease, transform 0.3s ease;
+    margin-top: 1rem;
+    display: block;
+    text-align: center;
+    max-width: 200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.back-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .about-content {
+        padding: 1rem;
+    }
+    .about-content h2 {
+        font-size: 1.5rem;
+    }
+    .about-content h3 {
+        font-size: 1.1rem;
+    }
+    .about-content p, .about-content li {
+        font-size: 0.9rem;
+    }
+}

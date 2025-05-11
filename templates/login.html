@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Connexion - Chatbot ISET{% endblock %}
+{% block content %}
+<div class="login-content text-center p-8 max-w-md mx-auto">
+  <h2 class="text-2xl mb-4">Connexion au Chatbot ISET</h2>
+  <p class="mb-6">"No brain waves without a login, bratuha , rules of the digital jungle!"</p>
+  <a href="{{ url_for('login') }}" class="btn bg-blue-500 text-white p-3 rounded hover:bg-blue-600 flex items-center justify-center gap-2">
+    <i class="shortcut-icon fas fa-sign-in-alt"></i> Connexion avec Gmail
+  </a>
+</div>
+<style>
+  .login-content {
+    background-color: var(--secondary-color);
+    border-radius: 0.5rem;
+  }
+</style>
+{% endblock %}
